@@ -1,0 +1,26 @@
+# ==========================================
+# Ejecutables y Binarios (Archivos generados)
+# ==========================================
+# Ignora el ejecutable final que genera tu script 'run.sh'
+app
+a.out
+*.out
+*.app
+
+# Archivos objeto compilados
+*.o
+*.obj
+
+# ==========================================
+# Archivos del Sistema / IDEs (Opcional)
+# ==========================================
+# Archivos temporales de Fedora/Linux
+.DS_Store
+*~
+*.swp
+
+# Configuración de editores (por si usas VS Code o CLion)
+.vscode/
+.idea/
+cmake-build-debug/
+cmake-build-release/
