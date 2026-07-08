@@ -21,27 +21,13 @@ struct Vec3 {
 
 struct Vertex {
   Vec3 posicion;
+  Vec3 color;
 };
 
 struct Triangle {
   Vertex v1, v2, v3;
 };
 
-struct Light {
-  Vec3 posicion;
-
-  Vec3 Lambiental;
-  Vec3 Ldifusa;
-  Vec3 Lespecular;
-};
-
-struct Material {
-  Vec3 Kambiental;
-  Vec3 Kdifusa;
-  Vec3 Kespecular;
-
-  float alpha; //brillo
-};
 
 void normalizar(Vec3& v);
 void dividir_triangulo(const Triangle& t, int n, std::vector<Triangle>& triangulosFinales);
@@ -61,47 +47,50 @@ int main () {
   // Compilar y usar shaders
   Shader ourShader("shader-vertices.vs", "shader-fragmentos.fs");
 
-  Vertex vertices[4] = {
-    {{0.0f, 0.0f, 1.0f}}, // Vértice A
+  // Color base 
+  Vec3 c = {1.0f, 1.0f, 1.0f};
 
-    {{0.0f, 0.942809f, -0.333333f}}, // Vértice B
-
-    {{-0.816497f, -0.471405f, -0.333333f}}, // Vértice C
-
-    {{0.816497f, -0.471405f, -0.333333f}}, // Vértice D
+  // El Cubo Maestro estructurado
+  Vertex verticesCubo[36] = {
+    // Cara Trasera
+    {{-0.5f, -0.5f, -0.5f}, c}, {{ 0.5f, -0.5f, -0.5f}, c}, {{ 0.5f,  0.5f, -0.5f}, c},
+    {{ 0.5f,  0.5f, -0.5f}, c}, {{-0.5f,  0.5f, -0.5f}, c}, {{-0.5f, -0.5f, -0.5f}, c},
+    // Cara Frontal
+    {{-0.5f, -0.5f,  0.5f}, c}, {{ 0.5f, -0.5f,  0.5f}, c}, {{ 0.5f,  0.5f,  0.5f}, c},
+    {{ 0.5f,  0.5f,  0.5f}, c}, {{-0.5f,  0.5f,  0.5f}, c}, {{-0.5f, -0.5f,  0.5f}, c},
+    // Cara Izquierda
+    {{-0.5f,  0.5f,  0.5f}, c}, {{-0.5f,  0.5f, -0.5f}, c}, {{-0.5f, -0.5f, -0.5f}, c},
+    {{-0.5f, -0.5f, -0.5f}, c}, {{-0.5f, -0.5f,  0.5f}, c}, {{-0.5f,  0.5f,  0.5f}, c},
+    // Cara Derecha
+    {{ 0.5f,  0.5f,  0.5f}, c}, {{ 0.5f,  0.5f, -0.5f}, c}, {{ 0.5f, -0.5f, -0.5f}, c},
+    {{ 0.5f, -0.5f, -0.5f}, c}, {{ 0.5f, -0.5f,  0.5f}, c}, {{ 0.5f,  0.5f,  0.5f}, c},
+    // Cara Inferior
+    {{-0.5f, -0.5f, -0.5f}, c}, {{ 0.5f, -0.5f, -0.5f}, c}, {{ 0.5f, -0.5f,  0.5f}, c},
+    {{ 0.5f, -0.5f,  0.5f}, c}, {{-0.5f, -0.5f,  0.5f}, c}, {{-0.5f, -0.5f, -0.5f}, c},
+    // Cara Superior
+    {{-0.5f,  0.5f, -0.5f}, c}, {{ 0.5f,  0.5f, -0.5f}, c}, {{ 0.5f,  0.5f,  0.5f}, c},
+    {{ 0.5f,  0.5f,  0.5f}, c}, {{-0.5f,  0.5f,  0.5f}, c}, {{-0.5f,  0.5f, -0.5f}, c}
   };
-
-  Triangle caras[4];
-  caras[0] = {vertices[0], vertices[1], vertices[2]};
-  caras[1] = {vertices[0], vertices[2], vertices[3]};
-  caras[2] = {vertices[0], vertices[3], vertices[1]};
-  caras[3] = {vertices[1], vertices[2], vertices[3]};
-
-  std::vector<Triangle> triangulosFinales;
-
-  int iteraciones = 4;
-  for (int i=0; i<4; i++){
-    dividir_triangulo(caras[i], iteraciones, triangulosFinales);
-  }
-
-  std::vector<Vertex> verticesEsfera;
-  for (const Triangle& t : triangulosFinales) {
-    verticesEsfera.push_back(t.v1);
-    verticesEsfera.push_back(t.v2);
-    verticesEsfera.push_back(t.v3);
-  }
 
   unsigned int VBO, VAO;
   glGenVertexArrays(1, &VAO);
   glGenBuffers(1, &VBO);
 
-  //vertices
   glBindVertexArray(VAO);
 
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  glBufferData(GL_ARRAY_BUFFER, verticesEsfera.size() * sizeof(Vertex), verticesEsfera.data(), GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(verticesCubo), verticesCubo, GL_STATIC_DRAW);
+
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
   glEnableVertexAttribArray(0);
+
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(3*sizeof(float)));
+  glEnableVertexAttribArray(1);
+
+  // Configurar el viewport inicial para los graficos coincida con el tamaño de la ventana
+  int width, height;
+  glfwGetFramebufferSize(window, &width, &height);
+  glViewport(0, 0, width, height);
 
   // render loop
   while (!glfwWindowShouldClose(window)) {
@@ -122,15 +111,16 @@ int main () {
     // glm::perspective(Campo de visión, Aspect Ratio, Cerca, Lejos)
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 100.0f);
 
-    // --- 3. MATRIZ DE VISTA (View / Cámara) ---
-    // glm::lookAt(Posición cámara, Punto al que mira, Vector Arriba)
+    //  Cámara 
+    // Movemos la cámara hacia abajo (Y = -25), la subimos un poco (Z = 15) 
+    // y la hacemos mirar hacia el centro del tablero (0, 0, 0)
     glm::mat4 view = glm::lookAt(
-        glm::vec3(0.0f, 0.0f, 4.0f), // Tu cámara real en Z=4
-        glm::vec3(0.0f, 0.0f, 0.0f), // Mirando directo al centro de la esfera
-        glm::vec3(0.0f, 1.0f, 0.0f)  // Indicamos que Y positivo es "hacia arriba"
+        glm::vec3(0.0f, -25.0f, 15.0f), 
+        glm::vec3(0.0f, 0.0f, 0.0f),    
+        glm::vec3(0.0f, 1.0f, 0.0f)     
     );
 
-    // --- 4. ENVIAR MATRICES AL VERTEX SHADER ---
+    //envia las matrices al shader de vertices
     unsigned int projLoc = glGetUniformLocation(ourShader.ID, "projection");
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
@@ -139,7 +129,29 @@ int main () {
 
     glBindVertexArray(VAO);
 
-    glDrawArrays(GL_TRIANGLES, 0, verticesEsfera.size());
+    // Obtener la ubicación de la matriz 'model'
+    unsigned int modelLoc = glGetUniformLocation(ourShader.ID, "model");
+
+    // --- PARED IZQUIERDA ---
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(-10.5f, 0.0f, 0.0f)); // Izquierda
+    model = glm::scale(model, glm::vec3(1.0f, 30.0f, 2.0f));      // Alto y profundo
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+
+    // --- PARED DERECHA ---
+    model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(10.5f, 0.0f, 0.0f));  // Derecha
+    model = glm::scale(model, glm::vec3(1.0f, 30.0f, 2.0f));      // Alto y profundo
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+
+    // --- PARED SUPERIOR (TECHO O FONDO) ---
+    model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(0.0f, 15.5f, 0.0f));  // Arriba
+    model = glm::scale(model, glm::vec3(22.0f, 1.0f, 2.0f));      // Ancho para tapar huecos
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+    glDrawArrays(GL_TRIANGLES, 0, 36);
 
     glfwSwapBuffers(window);
     glfwPollEvents();
@@ -160,8 +172,8 @@ GLFWwindow* initGLFW(int width, int height) {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-  GLFWwindow* window = glfwCreateWindow(width, height, "Esfera Iluminada V2", NULL, NULL);
+  glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE); // maximizar ventana
+  GLFWwindow* window = glfwCreateWindow(width, height, "Arkanoid 3D", NULL, NULL);
   if (!window) {
       std::cout << "Error creando ventana\n";
       glfwTerminate();
