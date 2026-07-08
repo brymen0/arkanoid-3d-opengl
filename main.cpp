@@ -19,7 +19,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 
 // STRUCTS para lógica geométrica/esferas
 struct Vec3 { float x, y, z; };
-struct Vertex { Vec3 posicion; Vec3 color; };
+struct Vertex { Vec3 posicion;};
 struct Triangle { Vertex v1, v2, v3; };
 
 void normalizar(Vec3& v);
@@ -76,6 +76,46 @@ class GameObject {
     }
 };
 
+class Pelota : public GameObject {
+  private:
+    glm::vec3 velocidad;
+    float radio;
+  public:
+    Pelota() {
+      velocidad = glm::vec3(7.0f, 9.0f, 0.0f); //movimiento diagonal
+      radio = 0.4f;    //mitad de la escala (0.8)
+    }
+
+  void Update (float dt) override {
+    glm::vec3 posActual = GetPosition();
+    posActual += velocidad * dt; // Movimiento basado en tiempo
+
+    // --- FÍSICAS DE REBOTE EN PAREDES ---
+    // Pared Izquierda (borde interno aprox en X = -10.0)
+    if (posActual.x - radio < -10.0f) {
+        posActual.x = -10.0f + radio;
+        velocidad.x = -velocidad.x;
+    }
+    // Pared Derecha (borde interno aprox en X = 10.0)
+    if (posActual.x + radio > 10.0f) {
+        posActual.x = 10.0f - radio;
+        velocidad.x = -velocidad.x;
+    }
+    // Pared Superior (borde interno aprox en Y = 24.0)
+    if (posActual.y + radio > 24.0f) {
+        posActual.y = 24.0f - radio;
+        velocidad.y = -velocidad.y;
+    }
+    // Suelo temporal (Para no perder la pelota mientras programamos la paleta)
+    if (posActual.y - radio < -14.0f) {
+        posActual.y = -14.0f + radio;
+        velocidad.y = -velocidad.y;
+    }
+
+    SetPosition(posActual);
+  }
+};
+
 // ==========================================
 // 3. CONFIGURACIONES GLOBALES
 // ==========================================
@@ -95,28 +135,27 @@ int main() {
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
   Shader ourShader("shader-vertices.vs", "shader-fragmentos.fs");
-  Vec3 c = {1.0f, 1.0f, 1.0f};
 
   // Cubo Maestro
   Vertex verticesCubo[36] = {
     // Cara Trasera
-    {{-0.5f, -0.5f, -0.5f}, c}, {{ 0.5f, -0.5f, -0.5f}, c}, {{ 0.5f,  0.5f, -0.5f}, c},
-    {{ 0.5f,  0.5f, -0.5f}, c}, {{-0.5f,  0.5f, -0.5f}, c}, {{-0.5f, -0.5f, -0.5f}, c},
+    {{-0.5f, -0.5f, -0.5f}}, {{ 0.5f, -0.5f, -0.5f}}, {{ 0.5f,  0.5f, -0.5f}},
+    {{ 0.5f,  0.5f, -0.5f}}, {{-0.5f,  0.5f, -0.5f}}, {{-0.5f, -0.5f, -0.5f}},
     // Cara Frontal
-    {{-0.5f, -0.5f,  0.5f}, c}, {{ 0.5f, -0.5f,  0.5f}, c}, {{ 0.5f,  0.5f,  0.5f}, c},
-    {{ 0.5f,  0.5f,  0.5f}, c}, {{-0.5f,  0.5f,  0.5f}, c}, {{-0.5f, -0.5f,  0.5f}, c},
+    {{-0.5f, -0.5f,  0.5f}}, {{ 0.5f, -0.5f,  0.5f}}, {{ 0.5f,  0.5f,  0.5f}},
+    {{ 0.5f,  0.5f,  0.5f}}, {{-0.5f,  0.5f,  0.5f}}, {{-0.5f, -0.5f,  0.5f}},
     // Cara Izquierda
-    {{-0.5f,  0.5f,  0.5f}, c}, {{-0.5f,  0.5f, -0.5f}, c}, {{-0.5f, -0.5f, -0.5f}, c},
-    {{-0.5f, -0.5f, -0.5f}, c}, {{-0.5f, -0.5f,  0.5f}, c}, {{-0.5f,  0.5f,  0.5f}, c},
+    {{-0.5f,  0.5f,  0.5f}}, {{-0.5f,  0.5f, -0.5f}}, {{-0.5f, -0.5f, -0.5f}},
+    {{-0.5f, -0.5f, -0.5f}}, {{-0.5f, -0.5f,  0.5f}}, {{-0.5f,  0.5f,  0.5f}},
     // Cara Derecha
-    {{ 0.5f,  0.5f,  0.5f}, c}, {{ 0.5f,  0.5f, -0.5f}, c}, {{ 0.5f, -0.5f, -0.5f}, c},
-    {{ 0.5f, -0.5f, -0.5f}, c}, {{ 0.5f, -0.5f,  0.5f}, c}, {{ 0.5f,  0.5f,  0.5f}, c},
+    {{ 0.5f,  0.5f,  0.5f}}, {{ 0.5f,  0.5f, -0.5f}}, {{ 0.5f, -0.5f, -0.5f}},
+    {{ 0.5f, -0.5f, -0.5f}}, {{ 0.5f, -0.5f,  0.5f}}, {{ 0.5f,  0.5f,  0.5f}},
     // Cara Inferior
-    {{-0.5f, -0.5f, -0.5f}, c}, {{ 0.5f, -0.5f, -0.5f}, c}, {{ 0.5f, -0.5f,  0.5f}, c},
-    {{ 0.5f, -0.5f,  0.5f}, c}, {{-0.5f, -0.5f,  0.5f}, c}, {{-0.5f, -0.5f, -0.5f}, c},
+    {{-0.5f, -0.5f, -0.5f}}, {{ 0.5f, -0.5f, -0.5f}}, {{ 0.5f, -0.5f,  0.5f}},
+    {{ 0.5f, -0.5f,  0.5f}}, {{-0.5f, -0.5f,  0.5f}}, {{-0.5f, -0.5f, -0.5f}},
     // Cara Superior
-    {{-0.5f,  0.5f, -0.5f}, c}, {{ 0.5f,  0.5f, -0.5f}, c}, {{ 0.5f,  0.5f,  0.5f}, c},
-    {{ 0.5f,  0.5f,  0.5f}, c}, {{-0.5f,  0.5f,  0.5f}, c}, {{-0.5f,  0.5f, -0.5f}, c}
+    {{-0.5f,  0.5f, -0.5f}}, {{ 0.5f,  0.5f, -0.5f}}, {{ 0.5f,  0.5f,  0.5f}},
+    {{ 0.5f,  0.5f,  0.5f}}, {{-0.5f,  0.5f,  0.5f}}, {{-0.5f,  0.5f, -0.5f}}
   };
 
   unsigned int VBO, VAO;
@@ -129,12 +168,54 @@ int main() {
 
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
   glEnableVertexAttribArray(0);
-  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(3 * sizeof(float)));
-  glEnableVertexAttribArray(1);
 
   int width, height;
   glfwGetFramebufferSize(window, &width, &height);
   glViewport(0, 0, width, height);
+
+  // configuracion tetraedro
+  Vertex vertices[4] = {
+    {{0.0f, 0.0f, 1.0f}}, // Vértice A
+
+    {{0.0f, 0.942809f, -0.333333f}}, // Vértice B
+
+    {{-0.816497f, -0.471405f, -0.333333f}}, // Vértice C
+
+    {{0.816497f, -0.471405f, -0.333333f}}, // Vértice D
+  };
+
+  Triangle caras[4];
+  caras[0] = {vertices[0], vertices[1], vertices[2]};
+  caras[1] = {vertices[0], vertices[2], vertices[3]};
+  caras[2] = {vertices[0], vertices[3], vertices[1]};
+  caras[3] = {vertices[1], vertices[2], vertices[3]};
+
+  std::vector<Triangle> triangulosFinales;
+
+  int iteraciones = 4;
+  for (int i=0; i<4; i++){
+    dividir_triangulo(caras[i], iteraciones, triangulosFinales);
+  }
+
+  std::vector<Vertex> verticesEsfera;
+  for (const Triangle& t : triangulosFinales) {
+    verticesEsfera.push_back(t.v1);
+    verticesEsfera.push_back(t.v2);
+    verticesEsfera.push_back(t.v3);
+  }
+
+  unsigned int VBO_esfera, VAO_esfera;
+  glGenVertexArrays(1, &VAO_esfera);
+  glGenBuffers(1, &VBO_esfera);
+
+  //vertices
+  glBindVertexArray(VAO_esfera);
+
+  glBindBuffer(GL_ARRAY_BUFFER, VBO_esfera);
+  glBufferData(GL_ARRAY_BUFFER, verticesEsfera.size() * sizeof(Vertex), verticesEsfera.data(), GL_STATIC_DRAW);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
+  glEnableVertexAttribArray(0);
+
 
   // --- INSTANCIACIÓN DE LAS PAREDES ---
   GameObject paredIzquierda;
@@ -151,6 +232,12 @@ int main() {
   paredSuperior.SetPosition(glm::vec3(0.0f, 24.5f, 0.0f));
   paredSuperior.SetScale(glm::vec3(20.0f, 1.0f, 1.0f));
   paredSuperior.SetColor(glm::vec3(0.5f, 0.5f, 0.5f));
+
+  // --- INSTANCIACIÓN DE LA PELOTA ---
+  Pelota pelota;
+  pelota.SetPosition(glm::vec3(0.0f, -5.0f, 0.0f));
+  pelota.SetScale(glm::vec3(0.8f, 0.8f, 0.8f));
+  pelota.SetColor(glm::vec3(1.0f, 0.5f, 0.0f)); // Naranja
 
   // --- GENERA LA MATRIZ DE BLOQUES (GRID) ---
   std::vector<GameObject> bloques;
@@ -189,10 +276,23 @@ int main() {
   paleta.SetScale(glm::vec3(8.0f, 1.0f, 1.0f));
   paleta.SetColor(glm::vec3(1.0f, 1.0f, 1.0f));
 
+  unsigned int modelLoc = glGetUniformLocation(ourShader.ID, "model");
+  unsigned int objectColorLoc = glGetUniformLocation(ourShader.ID, "objectColor");
+
+  float deltaTime = 0.0f;
+  float lastFrame = 0.0f;
 
   // Render Loop
   while (!glfwWindowShouldClose(window)) {
+    // 1. Calcular el tiempo transcurrido (Delta Time)
+    float currentFrame = static_cast<float>(glfwGetTime());
+    deltaTime = currentFrame - lastFrame;
+    lastFrame = currentFrame;
+
     processInput(window);
+
+    // 2. Actualizar la lógica y posición de la pelota
+    pelota.Update(deltaTime);
     
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -218,9 +318,6 @@ int main() {
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
     glBindVertexArray(VAO);
-    unsigned int modelLoc = glGetUniformLocation(ourShader.ID, "model");
-
-    unsigned int objectColorLoc = glGetUniformLocation(ourShader.ID, "objectColor");
 
     // --- DIBUJADO DE PAREDES --
     glUniform3fv(objectColorLoc, 1, glm::value_ptr(paredIzquierda.GetColor()));
@@ -248,6 +345,13 @@ int main() {
     glUniform3fv(objectColorLoc, 1, glm::value_ptr(paleta.GetColor()));
     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(paleta.GetModelMatrix()));
     glDrawArrays(GL_TRIANGLES, 0, 36);
+
+    //  PELOTA
+    glBindVertexArray(VAO_esfera); // ¡Cambiamos al molde de la esfera!
+    glUniform3fv(objectColorLoc, 1, glm::value_ptr(pelota.GetColor()));
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(pelota.GetModelMatrix()));
+    // Dibujamos todos los vértices generados dinámicamente por la subdivisión
+    glDrawArrays(GL_TRIANGLES, 0, verticesEsfera.size());
 
 
     glfwSwapBuffers(window);
@@ -309,7 +413,7 @@ Vertex punto_medio(const Vertex& v1, const Vertex& v2) {
   p.posicion.x = (v1.posicion.x + v2.posicion.x) / 2.0f;
   p.posicion.y = (v1.posicion.y + v2.posicion.y) / 2.0f;
   p.posicion.z = (v1.posicion.z + v2.posicion.z) / 2.0f;
-  p.color = v1.color; 
+  //p.color = v1.color; 
   return p;
 }
 
