@@ -9,32 +9,32 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "shader_s.h"
 
-// ==========================================
-// 1. DECLARACIÓN DE FUNCIONES GLOBALES
-// ==========================================
-GLFWwindow* initGLFW(int width, int height);
-bool initGLAD();
-void processInput(GLFWwindow *window);
-void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-
-// STRUCTS para lógica geométrica/esferas
-struct Vec3 { float x, y, z; };
-struct Vertex { Vec3 posicion;};
-struct Triangle { Vertex v1, v2, v3; };
-
-void normalizar(Vec3& v);
-Vertex punto_medio(const Vertex& v1, const Vertex& v2);
-void dividir_triangulo(const Triangle& t, int n, std::vector<Triangle>& triangulosFinales);
 
 // ==========================================
-// 2. ESTRUCTURAS Y CLASES
+// 1. ESTRUCTURAS Y CLASES
 // ==========================================
+
+// AABB = "Axis Aligned Bounding Box".
+// Es una caja imaginaria alineada con los ejes X, Y, Z que usamos
+// para saber si dos objetos se están tocando (colisión simple).
+struct AABB {
+  glm::vec3 min;
+  glm::vec3 max;
+};
+
+// Transform agrupa la posición, rotación y escala de un objeto.
+// Separarlo en su propia estructura evita repetir estas 3 variables
+// en cada clase que necesite ubicarse en el mundo 3D.
 struct Transform {
   glm::vec3 position = glm::vec3(0.0f);
   glm::vec3 rotation = glm::vec3(0.0f); 
   glm::vec3 scale    = glm::vec3(1.0f);
 };
 
+// GameObject es la clase base de todo lo que se dibuja en el juego
+// (paredes, bloques, paleta, pelota). Contiene lo que TODOS comparten:
+// posición/rotación/escala, color, si está activo, y cómo calcular
+// su matriz de modelo y su caja de colisión.
 class GameObject {
   protected:
     glm::vec3 color;
@@ -42,10 +42,13 @@ class GameObject {
     bool active = true;
 
   public:
-    virtual void Update(float dt) {}
+    // Update() se sobreescribe en las clases hijas que necesitan
+    // moverse o comportarse de forma especial (Paleta, Pelota).
+    // Las paredes y bloques no la necesitan, por eso queda vacía aquí.
+    virtual void Update() {}
     virtual ~GameObject() = default;
 
-    // Getters y Setters 
+    // Getters y Setters
     void SetPosition(const glm::vec3& position) { transform.position = position; }
     glm::vec3 GetPosition() const { return transform.position; }
 
@@ -61,7 +64,15 @@ class GameObject {
     void SetColor(const glm::vec3& color_update) {color = color_update;}
     glm::vec3 GetColor() const { return color; }
 
-    // Calcula y devuelve la matriz de modelo
+    // Caja de colisión por defecto: un cubo centrado en la posición,
+    // del tamaño de la escala. La Pelota la redefine porque es una esfera.
+    virtual AABB GetCollider() const {
+      glm::vec3 halfExtents = transform.scale * 0.5f;
+      return { transform.position - halfExtents, transform.position + halfExtents };
+    }
+
+    // Calcula la matriz de modelo (traslada, rota y escala el cubo base
+    // para convertirlo en este objeto concreto dentro del mundo).
     glm::mat4 GetModelMatrix() const {
       glm::mat4 model = glm::mat4(1.0f);
       model = glm::translate(model, transform.position);
@@ -76,51 +87,148 @@ class GameObject {
     }
 };
 
+// Paleta: la controla el jugador. Solo se mueve en X (izquierda/derecha)
+// y en Z (adelante/atrás), y no puede salir del área de juego.
+class Paleta : public GameObject {
+  public:
+    void Update() override {
+      glm::vec3 pos = GetPosition();
+      glm::vec3 mitadEscala = GetScale() * 0.5f;
+
+      // --- Límite eje X (paredes izquierda/derecha en -10 / 10) ---
+      const float xMin = -10.0f;
+      const float xMax =  10.0f;
+
+      if (pos.x - mitadEscala.x < xMin)
+          pos.x = xMin + mitadEscala.x;
+      if (pos.x + mitadEscala.x > xMax)
+          pos.x = xMax - mitadEscala.x;
+
+      // --- Límite eje Z (mismo rango que usa la pelota: 0 a 2) ---
+      const float zMin = 0.0f;
+      const float zMax = 2.0f;
+
+      if (pos.z - mitadEscala.z < zMin)
+          pos.z = zMin + mitadEscala.z;
+      if (pos.z + mitadEscala.z > zMax)
+          pos.z = zMax - mitadEscala.z;
+
+      SetPosition(pos);
+    }
+
+    // Devuelve la paleta a su posición inicial. Se usa al reiniciar el juego.
+    void Reiniciar(const glm::vec3& posicionInicial) {
+      SetPosition(posicionInicial);
+    }
+};
+
+// Pelota: se mueve sola a velocidad constante y rebota en las paredes.
+// A diferencia de los demás objetos, su colisión es una esfera, no un cubo.
 class Pelota : public GameObject {
   private:
     glm::vec3 velocidad;
     float radio;
+
+    // Velocidad con la que arranca la pelota siempre que se (re)inicia el juego.
+    // Se guarda en un solo lugar para no repetir estos valores en varias partes.
+    static glm::vec3 VelocidadInicial() { return glm::vec3(7.0f, 9.0f, 1.0f); }
+
   public:
     Pelota() {
-      velocidad = glm::vec3(7.0f, 9.0f, 0.0f); //movimiento diagonal
-      radio = 0.4f;    //mitad de la escala (0.8)
+      velocidad = VelocidadInicial();
+      radio = 0.4f;
+    }
+    void InvertirY() { velocidad.y = -velocidad.y; }
+
+    AABB GetCollider() const override {
+      glm::vec3 r(radio, radio, radio);
+      return { GetPosition() - r, GetPosition() + r };
     }
 
-  void Update (float dt) override {
-    glm::vec3 posActual = GetPosition();
-    posActual += velocidad * dt; // Movimiento basado en tiempo
+    void Update () override {
+      glm::vec3 posActual = GetPosition();
+      posActual += velocidad * 0.02f;
 
-    // --- FÍSICAS DE REBOTE EN PAREDES ---
-    // Pared Izquierda (borde interno aprox en X = -10.0)
-    if (posActual.x - radio < -10.0f) {
-        posActual.x = -10.0f + radio;
-        velocidad.x = -velocidad.x;
-    }
-    // Pared Derecha (borde interno aprox en X = 10.0)
-    if (posActual.x + radio > 10.0f) {
-        posActual.x = 10.0f - radio;
-        velocidad.x = -velocidad.x;
-    }
-    // Pared Superior (borde interno aprox en Y = 24.0)
-    if (posActual.y + radio > 24.0f) {
-        posActual.y = 24.0f - radio;
-        velocidad.y = -velocidad.y;
-    }
-    // Suelo temporal (Para no perder la pelota mientras programamos la paleta)
-    if (posActual.y - radio < -14.0f) {
-        posActual.y = -14.0f + radio;
-        velocidad.y = -velocidad.y;
+      // --- Colisión con paredes laterales (izquierda/derecha, eje X) ---
+      if (posActual.x - radio < -10.0f) {
+          posActual.x = -10.0f + radio;
+          velocidad.x = -velocidad.x;
+      }
+      if (posActual.x + radio > 10.0f) {
+          posActual.x = 10.0f - radio;
+          velocidad.x = -velocidad.x;
+      }
+
+      // --- Colisión con la pared del fondo (arriba, donde están los bloques) ---
+      if (posActual.y + radio > 24.0f) {
+          posActual.y = 24.0f - radio;
+          velocidad.y = -velocidad.y;
+      }
+ 
+
+      // --- Colisión en el eje Z (profundidad) ---
+      const float zMin = 0.0f;   // "piso" en profundidad, no puede pasar a negativo
+      const float zMax = 2.0f;   // límite invisible equivalente al "techo"
+
+      if (posActual.z - radio < zMin) {
+          posActual.z = zMin + radio;
+          velocidad.z = -velocidad.z;
+      }
+      if (posActual.z + radio > zMax) {
+          posActual.z = zMax - radio;
+          velocidad.z = -velocidad.z;
+      }
+
+      SetPosition(posActual);
     }
 
-    SetPosition(posActual);
-  }
+    // Devuelve la pelota a su posición y velocidad inicial.
+    // Se usa al reiniciar el juego (cuando se pierde).
+    void Reiniciar(const glm::vec3& posicionInicial) {
+      SetPosition(posicionInicial);
+      velocidad = VelocidadInicial();
+    }
 };
+
+
+// ==========================================
+// 2. DECLARACIÓN DE FUNCIONES GLOBALES
+// ==========================================
+GLFWwindow* initGLFW(int width, int height);
+bool initGLAD();
+void processInput(GLFWwindow *window, GameObject& paleta);
+void framebuffer_size_callback(GLFWwindow* window, int width, int height);
+bool CheckCollision(const GameObject& a, const GameObject& b);
+
+// Construye (o reconstruye) la matriz de bloques del juego.
+void GenerarBloques(std::vector<GameObject>& bloques);
+
+// Vuelve a dejar el juego como al principio: pelota, paleta y bloques.
+void ReiniciarJuego(Pelota& pelota, Paleta& paleta, std::vector<GameObject>& bloques);
+
+// STRUCTS para lógica geométrica/esferas
+struct Vec3 { float x, y, z; };
+struct Vertex { Vec3 posicion;};
+struct Triangle { Vertex v1, v2, v3; };
+
+void normalizar(Vec3& v);
+Vertex punto_medio(const Vertex& v1, const Vertex& v2);
+void dividir_triangulo(const Triangle& t, int n, std::vector<Triangle>& triangulosFinales);
 
 // ==========================================
 // 3. CONFIGURACIONES GLOBALES
 // ==========================================
 const unsigned int SCR_WIDTH = 1200;
 const unsigned int SCR_HEIGHT = 1000;
+
+// Posiciones iniciales de la pelota y la paleta. Se usan tanto al empezar
+// el juego como cada vez que se reinicia, para no repetir estos valores.
+const glm::vec3 POSICION_INICIAL_PELOTA(0.0f, -5.0f, 0.0f);
+const glm::vec3 POSICION_INICIAL_PALETA(0.0f, -12.0f, 0.0f);
+
+// Si la pelota cruza esta línea en Y es porque pasó detrás de la paleta
+// sin ser golpeada: el jugador pierde y el juego se reinicia.
+const float LIMITE_DERROTA_Y = -14.0f;
 
 // ==========================================
 // 4. FUNCIÓN PRINCIPAL (MAIN)
@@ -220,59 +328,39 @@ int main() {
   // --- INSTANCIACIÓN DE LAS PAREDES ---
   GameObject paredIzquierda;
   paredIzquierda.SetPosition(glm::vec3(-10.5f, 0.0f, 0.0f));
-  paredIzquierda.SetScale(glm::vec3(1.0f, 50.0f, 1.0f));
+  paredIzquierda.SetScale(glm::vec3(0.5f, 50.0f, 3.0f));
   paredIzquierda.SetColor(glm::vec3(0.5f, 0.5f, 0.5f));
 
   GameObject paredDerecha;
   paredDerecha.SetPosition(glm::vec3(10.5f, 0.0f, 0.0f));
-  paredDerecha.SetScale(glm::vec3(1.0f, 50.0f, 1.0f));
+  paredDerecha.SetScale(glm::vec3(0.5f, 50.0f, 3.0f));
   paredDerecha.SetColor(glm::vec3(0.5f, 0.5f, 0.5f));
 
-  GameObject paredSuperior;
-  paredSuperior.SetPosition(glm::vec3(0.0f, 24.5f, 0.0f));
-  paredSuperior.SetScale(glm::vec3(20.0f, 1.0f, 1.0f));
-  paredSuperior.SetColor(glm::vec3(0.5f, 0.5f, 0.5f));
+  GameObject paredFondo;
+  paredFondo.SetPosition(glm::vec3(0.0f, 25.0f, 0.0f));
+  paredFondo.SetScale(glm::vec3(21.5f, 0.5f, 3.0f));
+  paredFondo.SetColor(glm::vec3(0.4f, 0.4f, 0.4f));
+
+  GameObject profundidad;
+  profundidad.SetPosition(glm::vec3(0.0f, 0.0f, -1.0f));
+  profundidad.SetScale(glm::vec3(20.0f, 50.0f, 1.0f));
+  profundidad.SetColor(glm::vec3(0.4f, 0.4f, 0.4f));
 
   // --- INSTANCIACIÓN DE LA PELOTA ---
   Pelota pelota;
-  pelota.SetPosition(glm::vec3(0.0f, -5.0f, 0.0f));
+  pelota.SetPosition(POSICION_INICIAL_PELOTA);
   pelota.SetScale(glm::vec3(0.8f, 0.8f, 0.8f));
   pelota.SetColor(glm::vec3(1.0f, 0.5f, 0.0f)); // Naranja
 
   // --- GENERA LA MATRIZ DE BLOQUES (GRID) ---
+  // La construcción del grid vive en GenerarBloques() para no repetir
+  // este mismo código en ReiniciarJuego() cuando el jugador pierde.
   std::vector<GameObject> bloques;
-  int rows = 5;
-  int columns = 5;
-  float stepHorizontal = 4.0f; 
-  float stepVertical = 3.0f;
-
-  glm::vec3 coloresPorColumna[5] = {
-    glm::vec3(1.0f, 0.0f, 0.0f), // Columna 0: Rojo
-    glm::vec3(1.0f, 0.6f, 0.0f), // Columna 1: Naranja
-    glm::vec3(1.0f, 1.0f, 0.0f), // Columna 2: Amarillo
-    glm::vec3(0.0f, 1.0f, 0.0f), // Columna 3: Verde
-    glm::vec3(0.0f, 0.6f, 1.0f)  // Columna 4: Azul 
-  };
-
-  for (int r = 0; r < rows; ++r) {
-    for (int c = 0; c < columns; ++c) {
-      GameObject bloque;
-      
-      float posX = -8.0f + (c * stepHorizontal);
-      float posY = 20.0f - (r * stepVertical);
-      
-      bloque.SetPosition(glm::vec3(posX, posY, 0.0f));
-      bloque.SetScale(glm::vec3(3.5f, 1.0f, 1.0f)); 
-
-      bloque.SetColor(coloresPorColumna[c]);
-      
-      bloques.push_back(bloque);
-    }
-  }
+  GenerarBloques(bloques);
 
   // --- PALETA ---
-  GameObject paleta;
-  paleta.SetPosition(glm::vec3(0.0f, -12.0f, 0.0f));
+  Paleta paleta;
+  paleta.SetPosition(POSICION_INICIAL_PALETA);
   paleta.SetScale(glm::vec3(8.0f, 1.0f, 1.0f));
   paleta.SetColor(glm::vec3(1.0f, 1.0f, 1.0f));
 
@@ -284,15 +372,32 @@ int main() {
 
   // Render Loop
   while (!glfwWindowShouldClose(window)) {
-    // 1. Calcular el tiempo transcurrido (Delta Time)
-    float currentFrame = static_cast<float>(glfwGetTime());
-    deltaTime = currentFrame - lastFrame;
-    lastFrame = currentFrame;
+ 
 
-    processInput(window);
+    processInput(window, paleta);
 
-    // 2. Actualizar la lógica y posición de la pelota
-    pelota.Update(deltaTime);
+    pelota.Update();
+    paleta.Update();
+
+    // --- CONDICIÓN DE DERROTA ---
+    // Si la pelota bajó más allá del límite trasero de la paleta, significa
+    // que la paleta no llegó a golpearla: se perdió el juego y se reinicia
+    // todo (pelota, paleta y bloques) a su estado original.
+    if (pelota.GetPosition().y < LIMITE_DERROTA_Y) {
+      ReiniciarJuego(pelota, paleta, bloques);
+    }
+
+    if (CheckCollision(pelota, paleta)) {
+      pelota.InvertirY();
+    }
+
+    for (auto& bloque : bloques) {
+      if (bloque.IsActive() && CheckCollision(pelota, bloque)) {
+        bloque.SetActive(false);
+        pelota.InvertirY();
+        break;
+      }
+    }
     
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -328,8 +433,12 @@ int main() {
     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(paredDerecha.GetModelMatrix()));
     glDrawArrays(GL_TRIANGLES, 0, 36);
     
-    glUniform3fv(objectColorLoc, 1, glm::value_ptr(paredSuperior.GetColor()));
-    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(paredSuperior.GetModelMatrix()));
+    glUniform3fv(objectColorLoc, 1, glm::value_ptr(paredFondo.GetColor()));
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(paredFondo.GetModelMatrix()));
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+    
+    glUniform3fv(objectColorLoc, 1, glm::value_ptr(profundidad.GetColor()));
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(profundidad.GetModelMatrix()));
     glDrawArrays(GL_TRIANGLES, 0, 36);
     
     // --- RENDERIZADO DE GRID ---
@@ -392,13 +501,72 @@ bool initGLAD() {
   return true;
 }
 
-void processInput(GLFWwindow *window) {
+void processInput(GLFWwindow *window, GameObject& paleta) {
   if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     glfwSetWindowShouldClose(window, true);
+
+  glm::vec3 pos = paleta.GetPosition();
+  
+  if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+    pos.x -= 0.3f;
+  if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+    pos.x += 0.3f;
+  if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+    pos.z += 0.3f;
+  if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+    pos.z -= 0.3f;
+
+  paleta.SetPosition(pos);
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
   glViewport(0, 0, width, height);
+}
+
+// Crea la cuadrícula de 5x5 bloques con sus posiciones y colores por columna.
+// Se llama una vez al iniciar el programa, y otra vez cada vez que el
+// jugador pierde y el juego se reinicia (ver ReiniciarJuego).
+void GenerarBloques(std::vector<GameObject>& bloques) {
+  bloques.clear(); // por si ya había bloques de una partida anterior
+
+  const int filas = 5;
+  const int columnas = 5;
+  const float pasoHorizontal = 4.0f;
+  const float pasoVertical = 3.0f;
+
+  glm::vec3 coloresPorColumna[5] = {
+    glm::vec3(1.0f, 0.0f, 0.0f), // Columna 0: Rojo
+    glm::vec3(1.0f, 0.6f, 0.0f), // Columna 1: Naranja
+    glm::vec3(1.0f, 1.0f, 0.0f), // Columna 2: Amarillo
+    glm::vec3(0.0f, 1.0f, 0.0f), // Columna 3: Verde
+    glm::vec3(0.0f, 0.6f, 1.0f)  // Columna 4: Azul
+  };
+
+  for (int fila = 0; fila < filas; ++fila) {
+    for (int columna = 0; columna < columnas; ++columna) {
+      GameObject bloque;
+
+      float posX = -8.0f + (columna * pasoHorizontal);
+      float posY = 20.0f - (fila * pasoVertical);
+
+      bloque.SetPosition(glm::vec3(posX, posY, 0.0f));
+      bloque.SetScale(glm::vec3(3.5f, 1.0f, 1.0f));
+      bloque.SetColor(coloresPorColumna[columna]);
+
+      bloques.push_back(bloque);
+    }
+  }
+}
+
+// Reinicia el juego por completo: se llama cuando la pelota pasa detrás
+// de la paleta sin ser golpeada. Deja la pelota, la paleta y los bloques
+// exactamente como estaban al iniciar el programa.
+void ReiniciarJuego(Pelota& pelota, Paleta& paleta, std::vector<GameObject>& bloques) {
+  pelota.Reiniciar(POSICION_INICIAL_PELOTA);
+  paleta.Reiniciar(POSICION_INICIAL_PALETA);
+  GenerarBloques(bloques);
+
+  std::cout << "Perdiste. Juego reiniciado.\n";
 }
 
 void normalizar(Vec3 &v) {
@@ -439,4 +607,17 @@ void dividir_triangulo(const Triangle& t, int n, std::vector<Triangle>& triangul
   dividir_triangulo(t2, n-1, triangulosFinales);
   dividir_triangulo(t3, n-1, triangulosFinales);
   dividir_triangulo(t4, n-1, triangulosFinales);
+}
+
+// Compara las cajas de colisión (AABB) de dos objetos y devuelve true
+// si se están tocando en los 3 ejes (X, Y, Z) al mismo tiempo.
+// Esta es la única función de colisión del juego: tanto pelota-paleta
+// como pelota-bloque la usan, así no hay dos versiones distintas del
+// mismo cálculo.
+bool CheckCollision(const GameObject& a, const GameObject& b) {
+  AABB cajaA = a.GetCollider();
+  AABB cajaB = b.GetCollider();
+  return (cajaA.min.x <= cajaB.max.x && cajaA.max.x >= cajaB.min.x) &&
+         (cajaA.min.y <= cajaB.max.y && cajaA.max.y >= cajaB.min.y) &&
+         (cajaA.min.z <= cajaB.max.z && cajaA.max.z >= cajaB.min.z);
 }
