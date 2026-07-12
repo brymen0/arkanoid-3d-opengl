@@ -208,8 +208,12 @@ void ReiniciarJuego(Pelota& pelota, Paleta& paleta, std::vector<GameObject>& blo
 
 // STRUCTS para lógica geométrica/esferas
 struct Vec3 { float x, y, z; };
-struct Vertex { Vec3 posicion;};
-struct Triangle { Vertex v1, v2, v3; };
+struct Vertex { 
+  Vec3 posicion;
+  Vec3 normal;
+};
+struct Triangle { 
+  Vertex v1, v2, v3; };
 
 void normalizar(Vec3& v);
 Vertex punto_medio(const Vertex& v1, const Vertex& v2);
@@ -244,6 +248,7 @@ int main() {
 
   Shader ourShader("shader-vertices.vs", "shader-fragmentos.fs");
 
+  /*
   // Cubo Maestro
   Vertex verticesCubo[36] = {
     // Cara Trasera
@@ -265,7 +270,58 @@ int main() {
     {{-0.5f,  0.5f, -0.5f}}, {{ 0.5f,  0.5f, -0.5f}}, {{ 0.5f,  0.5f,  0.5f}},
     {{ 0.5f,  0.5f,  0.5f}}, {{-0.5f,  0.5f,  0.5f}}, {{-0.5f,  0.5f, -0.5f}}
   };
+  */
+ Vertex verticesCubo[36] = {
+    // Cara Trasera (Normal apunta hacia -Z)
+    {{-0.5f, -0.5f, -0.5f}, { 0.0f,  0.0f, -1.0f}}, 
+    {{ 0.5f, -0.5f, -0.5f}, { 0.0f,  0.0f, -1.0f}}, 
+    {{ 0.5f,  0.5f, -0.5f}, { 0.0f,  0.0f, -1.0f}},
+    {{ 0.5f,  0.5f, -0.5f}, { 0.0f,  0.0f, -1.0f}}, 
+    {{-0.5f,  0.5f, -0.5f}, { 0.0f,  0.0f, -1.0f}}, 
+    {{-0.5f, -0.5f, -0.5f}, { 0.0f,  0.0f, -1.0f}},
 
+    // Cara Frontal (Normal apunta hacia +Z)
+    {{-0.5f, -0.5f,  0.5f}, { 0.0f,  0.0f,  1.0f}}, 
+    {{ 0.5f, -0.5f,  0.5f}, { 0.0f,  0.0f,  1.0f}}, 
+    {{ 0.5f,  0.5f,  0.5f}, { 0.0f,  0.0f,  1.0f}},
+    {{ 0.5f,  0.5f,  0.5f}, { 0.0f,  0.0f,  1.0f}}, 
+    {{-0.5f,  0.5f,  0.5f}, { 0.0f,  0.0f,  1.0f}}, 
+    {{-0.5f, -0.5f,  0.5f}, { 0.0f,  0.0f,  1.0f}},
+
+    // Cara Izquierda (Normal apunta hacia -X)
+    {{-0.5f,  0.5f,  0.5f}, {-1.0f,  0.0f,  0.0f}}, 
+    {{-0.5f,  0.5f, -0.5f}, {-1.0f,  0.0f,  0.0f}}, 
+    {{-0.5f, -0.5f, -0.5f}, {-1.0f,  0.0f,  0.0f}},
+    {{-0.5f, -0.5f, -0.5f}, {-1.0f,  0.0f,  0.0f}}, 
+    {{-0.5f, -0.5f,  0.5f}, {-1.0f,  0.0f,  0.0f}}, 
+    {{-0.5f,  0.5f,  0.5f}, {-1.0f,  0.0f,  0.0f}},
+
+    // Cara Derecha (Normal apunta hacia +X)
+    {{ 0.5f,  0.5f,  0.5f}, { 1.0f,  0.0f,  0.0f}}, 
+    {{ 0.5f,  0.5f, -0.5f}, { 1.0f,  0.0f,  0.0f}}, 
+    {{ 0.5f, -0.5f, -0.5f}, { 1.0f,  0.0f,  0.0f}},
+    {{ 0.5f, -0.5f, -0.5f}, { 1.0f,  0.0f,  0.0f}}, 
+    {{ 0.5f, -0.5f,  0.5f}, { 1.0f,  0.0f,  0.0f}}, 
+    {{ 0.5f,  0.5f,  0.5f}, { 1.0f,  0.0f,  0.0f}},
+
+    // Cara Inferior (Normal apunta hacia -Y)
+    {{-0.5f, -0.5f, -0.5f}, { 0.0f, -1.0f,  0.0f}}, 
+    {{ 0.5f, -0.5f, -0.5f}, { 0.0f, -1.0f,  0.0f}}, 
+    {{ 0.5f, -0.5f,  0.5f}, { 0.0f, -1.0f,  0.0f}},
+    {{ 0.5f, -0.5f,  0.5f}, { 0.0f, -1.0f,  0.0f}}, 
+    {{-0.5f, -0.5f,  0.5f}, { 0.0f, -1.0f,  0.0f}}, 
+    {{-0.5f, -0.5f, -0.5f}, { 0.0f, -1.0f,  0.0f}},
+
+    // Cara Superior (Normal apunta hacia +Y)
+    {{-0.5f,  0.5f, -0.5f}, { 0.0f,  1.0f,  0.0f}}, 
+    {{ 0.5f,  0.5f, -0.5f}, { 0.0f,  1.0f,  0.0f}}, 
+    {{ 0.5f,  0.5f,  0.5f}, { 0.0f,  1.0f,  0.0f}},
+    {{ 0.5f,  0.5f,  0.5f}, { 0.0f,  1.0f,  0.0f}}, 
+    {{-0.5f,  0.5f,  0.5f}, { 0.0f,  1.0f,  0.0f}}, 
+    {{-0.5f,  0.5f, -0.5f}, { 0.0f,  1.0f,  0.0f}}
+  };
+
+  //VAO del cubo
   unsigned int VBO, VAO;
   glGenVertexArrays(1, &VAO);
   glGenBuffers(1, &VBO);
@@ -273,9 +329,13 @@ int main() {
   glBindVertexArray(VAO);
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
   glBufferData(GL_ARRAY_BUFFER, sizeof(verticesCubo), verticesCubo, GL_STATIC_DRAW);
-
+  //posicion
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
   glEnableVertexAttribArray(0);
+  //normal
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(3 * sizeof(float)));
+  glEnableVertexAttribArray(1);
+
 
   int width, height;
   glfwGetFramebufferSize(window, &width, &height);
@@ -283,13 +343,13 @@ int main() {
 
   // configuracion tetraedro
   Vertex vertices[4] = {
-    {{0.0f, 0.0f, 1.0f}}, // Vértice A
+    {{0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}}, // Vértice A
 
-    {{0.0f, 0.942809f, -0.333333f}}, // Vértice B
+    {{0.0f, 0.942809f, -0.333333f}, {0.0f, 0.942809f, -0.333333f}}, // Vértice B
 
-    {{-0.816497f, -0.471405f, -0.333333f}}, // Vértice C
+    {{-0.816497f, -0.471405f, -0.333333f}, {-0.816497f, -0.471405f, -0.333333f}}, // Vértice C
 
-    {{0.816497f, -0.471405f, -0.333333f}}, // Vértice D
+    {{0.816497f, -0.471405f, -0.333333f}, {0.816497f, -0.471405f, -0.333333f}}, // Vértice D
   };
 
   Triangle caras[4];
@@ -312,6 +372,7 @@ int main() {
     verticesEsfera.push_back(t.v3);
   }
 
+  //VAO esfera
   unsigned int VBO_esfera, VAO_esfera;
   glGenVertexArrays(1, &VAO_esfera);
   glGenBuffers(1, &VBO_esfera);
@@ -321,8 +382,12 @@ int main() {
 
   glBindBuffer(GL_ARRAY_BUFFER, VBO_esfera);
   glBufferData(GL_ARRAY_BUFFER, verticesEsfera.size() * sizeof(Vertex), verticesEsfera.data(), GL_STATIC_DRAW);
+  //posicion
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
   glEnableVertexAttribArray(0);
+  //normal
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(3 * sizeof(float)));
+  glEnableVertexAttribArray(1);
 
 
   // --- INSTANCIACIÓN DE LAS PAREDES ---
@@ -367,8 +432,13 @@ int main() {
   unsigned int modelLoc = glGetUniformLocation(ourShader.ID, "model");
   unsigned int objectColorLoc = glGetUniformLocation(ourShader.ID, "objectColor");
 
-  float deltaTime = 0.0f;
+  // NUEVAS UBICACIONES
+  unsigned int lightPosLoc = glGetUniformLocation(ourShader.ID, "lightPos");
+  unsigned int lightColorLoc = glGetUniformLocation(ourShader.ID, "lightColor");
+  unsigned int esSolLoc = glGetUniformLocation(ourShader.ID, "esSol");
+  
   float lastFrame = 0.0f;
+  float deltaTime = 0.0f;
 
   // Render Loop
   while (!glfwWindowShouldClose(window)) {
@@ -403,6 +473,11 @@ int main() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     ourShader.use();
+    // La fuente de luz es exactamente la posición actual de la pelota
+    glUniform3fv(lightPosLoc, 1, glm::value_ptr(pelota.GetPosition()));
+    
+    // Luz blanca para que los bloques mantengan sus propios colores naturales
+    glUniform3f(lightColorLoc, 1.0f, 1.0f, 1.0f);
 
     int currentWidth, currentHeight;
     glfwGetFramebufferSize(window, &currentWidth, &currentHeight);
@@ -424,6 +499,7 @@ int main() {
 
     glBindVertexArray(VAO);
 
+    glUniform1i(esSolLoc, 0);
     // --- DIBUJADO DE PAREDES --
     glUniform3fv(objectColorLoc, 1, glm::value_ptr(paredIzquierda.GetColor()));
     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(paredIzquierda.GetModelMatrix()));
@@ -456,6 +532,7 @@ int main() {
     glDrawArrays(GL_TRIANGLES, 0, 36);
 
     //  PELOTA
+    glUniform1i(esSolLoc, 1);
     glBindVertexArray(VAO_esfera); // ¡Cambiamos al molde de la esfera!
     glUniform3fv(objectColorLoc, 1, glm::value_ptr(pelota.GetColor()));
     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(pelota.GetModelMatrix()));
@@ -581,7 +658,7 @@ Vertex punto_medio(const Vertex& v1, const Vertex& v2) {
   p.posicion.x = (v1.posicion.x + v2.posicion.x) / 2.0f;
   p.posicion.y = (v1.posicion.y + v2.posicion.y) / 2.0f;
   p.posicion.z = (v1.posicion.z + v2.posicion.z) / 2.0f;
-  //p.color = v1.color; 
+  p.normal = p.posicion;
   return p;
 }
 
