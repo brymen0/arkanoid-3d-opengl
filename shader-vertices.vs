@@ -17,10 +17,8 @@ void main() {
     // Guardamos la posición del objeto en el mundo 3D
     FragPos = vec3(model * vec4(aPos, 1.0));
     
-    // Truco temporal: Usamos la posición local como "Normal". 
-    // La matriz inversa evita que la luz se deforme si estiras el objeto.
-    //Normal = mat3(transpose(inverse(model))) * aPos;
-    Normal =  aNormal;
+    // transformar las normales al marco del mundo (mat3 porque en las normales nos immporta la direccion unicamente (no importa la traslación))
+    Normal = mat3(transpose(inverse(model))) * aNormal;
 
     Color = objectColor;
 }

@@ -3,42 +3,58 @@ out vec4 FragColor;
 
 in vec3 FragPos;
 in vec3 Normal;
-in vec3 Color;
+in vec3 Color; // color real del cubo 
 
 uniform vec3 lightPos;   // Posición de la pelota
 uniform vec3 lightColor; 
-uniform bool esSol;      // ¡Nuestro interruptor mágico!
+uniform bool esSol;     
+uniform vec3 viewPos;    // posición de la cámara (necesaria para el brillo)
+
+// Matriz L 
+const vec3 La = vec3(0.5, 0.5, 0.5);
+const vec3 Ld = vec3(15.0, 15.0, 15.0);
+const vec3 Le = vec3(5.0, 5.0, 5.0);
+
+// Matriz k - Constantes de Material
+const vec3 Ke = vec3(0.3, 0.3, 0.3); // Reflejo blanco
+const float alpha = 64.0;            
+//ka y kd sera igual al color del cubo, ya que cada cubo tiene un color diferente, y se pasa como variable de entrada al shader
 
 void main() {
-    // Si este objeto es la pelota, se dibuja con su color puro (como un sol)
-    if(esSol) {
-        FragColor = vec4(Color, 1.0);
-        return; 
-    }
+  // Si este objeto es la pelota, se dibuja con su color puro (como un sol)
+  if(esSol) {
+      FragColor = vec4(Color, 1.0);
+      return; 
+  }
 
-    // --- Si NO es el sol, calculamos cómo le pega la luz ---
+  // Si no es la pelota, calculamos cómo le pega la luz
+  vec3 Ka = Color; 
+  vec3 Kd = Color;
 
-    // 1. Luz Ambiente (muy bajita para que el juego se vea oscuro lejos de la pelota)
-    float ambientStrength = 0.1;
-    vec3 ambient = ambientStrength * lightColor;
-  	
-    // 2. Luz Difusa
-    vec3 norm = normalize(Normal);
-    vec3 lightDir = normalize(lightPos - FragPos);
-    float diff = max(dot(norm, lightDir), 0.0);
-    vec3 diffuse = diff * lightColor;
-    
-    // 3. Atenuación (La luz muere con la distancia)
-    // Calculamos la distancia entre este píxel y la pelota
-    float distance = length(lightPos - FragPos);
-    // Fórmula para que la luz caiga suavemente (puedes ajustar el 0.05 para que alumbre más o menos lejos)
-    float attenuation = 1.0 / (1.0 + 0.05 * (distance * distance));
-            
-    // Aplicamos la atenuación a la luz ambiente y difusa
-    ambient *= attenuation;
-    diffuse *= attenuation;
+  //calculo de vectores
+  vec3 n = normalize(Normal);
+  vec3 l = normalize(lightPos - FragPos);
+  vec3 v = normalize(viewPos - FragPos);
+  vec3 r = normalize(2.0 * dot(n, l) * n - l);
 
-    // 4. Resultado Final
-    vec3 result = (ambient + diffuse) * Color;
-    FragColor = vec4(result, 1.0);
+  // ILuminación ambiental
+  vec3 Ia = La * Ka;
+
+  float dist = pow(lightPos.x - FragPos.x,2.0) + pow(lightPos.y - FragPos.y,2.0) + pow(lightPos.z - FragPos.z,2.0);
+  float distInverso = 1.0 / dist;
+
+  // iluminacion difusa
+  float prodPuntoNL = dot(n, l);
+  float diff = max(prodPuntoNL, 0.0);
+  vec3 Id = (Kd * Ld * diff) * distInverso;
+
+  // iluminacion especular
+  float spec = pow(max(dot(r, v), 0.0), alpha);
+  vec3 Ie = Ke * Le * spec * distInverso;
+
+  vec3 colorFinal = Ia + Id +Ie;
+  // clamp() es la función nativa de GLSL para limitar valores entre 0 y 1
+  colorFinal = clamp(colorFinal, 0.0, 1.0);
+  
+   FragColor = vec4(colorFinal, 1.0);
 }
