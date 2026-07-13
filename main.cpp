@@ -98,6 +98,41 @@ class GameObject {
     }
 };
 
+// Bloque
+class Bloque : public GameObject {
+  private:
+    bool destruyendo = false;
+    float velocidadEncogimiento = 6.0f; 
+
+  public:
+    void Update() override {
+      if (!destruyendo) return;
+
+      float paso = velocidadEncogimiento * 0.02f;
+      glm::vec3 escala = GetScale() - glm::vec3(paso);
+      escala = glm::max(escala, glm::vec3(0.0f)); 
+
+      SetScale(escala);
+
+      if (escala.x <= 0.0f && escala.y <= 0.0f && escala.z <= 0.0f) {
+        destruyendo = false;
+      }
+    }
+
+    // Se llama al recibir el golpe de la pelota: deja de colisionar
+    // de inmediato pero se mantiene visible mientras se encoge.
+    void Destruir() {
+      SetActive(false);
+      destruyendo = true;
+    }
+
+    bool DebeDibujarse() const {
+      return IsActive() || destruyendo;
+    }
+};
+
+
+
 // Paleta: la controla el jugador. Solo se mueve en X (izquierda/derecha) y en Z (adelante/atrás), y no puede salir del área de juego.
 class Paleta : public GameObject {
   public:
@@ -134,7 +169,7 @@ class Pelota : public GameObject {
   private:
     glm::vec3 velocidad;
     float radio;
-
+    float rotacionX = 0.0f;
     // Velocidad con la que arranca la pelota siempre que se (re)inicia el juego.
     // Se guarda en un solo lugar para no repetir estos valores en varias partes.
     static glm::vec3 VelocidadInicial() { return glm::vec3(7.0f, 9.0f, 1.0f); }
@@ -181,6 +216,15 @@ class Pelota : public GameObject {
       }
 
       SetPosition(posActual);
+
+      const float RAD_A_GRADOS = 57.2958f; // 180/pi
+      float rapidez = glm::length(velocidad); 
+      float velocidadAngular = (rapidez / radio) * RAD_A_GRADOS; 
+
+      rotacionX -= velocidadAngular * 0.02f; // negativo = sentido antihorario
+      rotacionX = fmodf(rotacionX, 360.0f);
+
+      SetRotation(glm::vec3(rotacionX, 0.0f, 0.0f));
     }
 
     // Devuelve la pelota a su posición y velocidad inicial.
@@ -188,6 +232,8 @@ class Pelota : public GameObject {
     void Reiniciar(const glm::vec3& posicionInicial) {
       SetPosition(posicionInicial);
       velocidad = VelocidadInicial();
+      rotacionX = 0.0f; 
+      SetRotation(glm::vec3(0.0f, 0.0f, 0.0f));
     }
 };
 
@@ -195,15 +241,15 @@ class Pelota : public GameObject {
 // 2. DECLARACIÓN DE FUNCIONES GLOBALES
 GLFWwindow* initGLFW(int width, int height);
 bool initGLAD();
-void processInput(GLFWwindow *window, Paleta& paleta, bool& gameOver, Pelota& pelota, std::vector<GameObject>& bloques);
+void processInput(GLFWwindow *window, Paleta& paleta, bool& gameOver, Pelota& pelota, std::vector<Bloque>& bloques);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 bool CheckCollision(const GameObject& a, const GameObject& b);
 
 // Construye (o reconstruye) la matriz de bloques del juego.
-void GenerarBloques(std::vector<GameObject>& bloques);
+void GenerarBloques(std::vector<Bloque>& bloques);
 
 // Vuelve a dejar el juego como al principio: pelota, paleta y bloques.
-void ReiniciarJuego(Pelota& pelota, Paleta& paleta, std::vector<GameObject>& bloques);
+void ReiniciarJuego(Pelota& pelota, Paleta& paleta, std::vector<Bloque>& bloques);
 
 void normalizar(Vec3& v);
 Vertex punto_medio(const Vertex& v1, const Vertex& v2);
@@ -421,7 +467,7 @@ int main() {
   pelota.SetColor(glm::vec3(1.0f, 0.5f, 0.0f)); // Naranja
 
   // GENERA LA MATRIZ DE BLOQUES
-  std::vector<GameObject> bloques;
+  std::vector<Bloque> bloques;
   GenerarBloques(bloques);
 
   //  PALETA 
@@ -464,8 +510,10 @@ int main() {
       }
 
       for (auto& bloque : bloques) {
+        bloque.Update(); // avanza el encogimiento si está destruyéndose
+
         if (bloque.IsActive() && CheckCollision(pelota, bloque)) {
-          bloque.SetActive(false);
+          bloque.Destruir();
           pelota.InvertirY();
           break;
         }
@@ -528,7 +576,7 @@ int main() {
     
     // RENDERIZADO DE GRID
     for (const auto& bloque : bloques) {
-      if (bloque.IsActive()) {
+      if (bloque.DebeDibujarse()) {  
         glUniform3fv(objectColorLoc, 1, glm::value_ptr(bloque.GetColor()));
         glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(bloque.GetModelMatrix()));
         glDrawArrays(GL_TRIANGLES, 0, 36);
@@ -589,7 +637,7 @@ bool initGLAD() {
   return true;
 }
 
-void processInput(GLFWwindow *window, Paleta& paleta, bool& gameOver, Pelota& pelota, std::vector<GameObject>& bloques) {
+void processInput(GLFWwindow *window, Paleta& paleta, bool& gameOver, Pelota& pelota, std::vector<Bloque>& bloques) {
   if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     glfwSetWindowShouldClose(window, true);
 
@@ -617,7 +665,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 }
 
 // Crea la cuadrícula de 5x5 bloques con sus posiciones y colores por columna
-void GenerarBloques(std::vector<GameObject>& bloques) {
+void GenerarBloques(std::vector<Bloque>& bloques) {
   bloques.clear(); // por si ya había bloques de una partida anterior
 
   const int filas = 4;
@@ -643,7 +691,7 @@ void GenerarBloques(std::vector<GameObject>& bloques) {
   for (int capa = 0; capa < capasZ; ++capa) {
     for (int fila = 0; fila < filas; ++fila) {
       for (int columna = 0; columna < columnas; ++columna) {
-        GameObject bloque;
+        Bloque bloque;
 
         float posX = -8.0f + (columna * pasoHorizontal);
         float posY = 20.0f - (fila * pasoVertical);
@@ -660,7 +708,7 @@ void GenerarBloques(std::vector<GameObject>& bloques) {
 }
 
 // Reinicia el juego. Se llama cuando la pelota pasa detrás de la paleta sin ser golpeada
-void ReiniciarJuego(Pelota& pelota, Paleta& paleta, std::vector<GameObject>& bloques) {
+void ReiniciarJuego(Pelota& pelota, Paleta& paleta, std::vector<Bloque>& bloques) {
   pelota.Reiniciar(POSICION_INICIAL_PELOTA);
   paleta.Reiniciar(POSICION_INICIAL_PALETA);
   GenerarBloques(bloques);
