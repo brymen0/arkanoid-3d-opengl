@@ -4,6 +4,7 @@ out vec4 FragColor;
 in vec3 FragPos;
 in vec3 Normal;
 in vec3 Color; // color real del cubo 
+in vec3 LocalPos;
 
 uniform vec3 lightPos;   // Posición de la pelota
 uniform vec3 lightColor; 
@@ -21,10 +22,18 @@ const float alpha = 64.0;
 //ka y kd sera igual al color del cubo, ya que cada cubo tiene un color diferente, y se pasa como variable de entrada al shader
 
 void main() {
-  // Si este objeto es la pelota, se dibuja con su color puro (como un sol)
+  // Si este objeto es la pelota
   if(esSol) {
-      FragColor = vec4(Color, 1.0);
-      return; 
+    // atan(z, x) nos da un ángulo radial alrededor de la pelota.
+      float angulo = atan(LocalPos.z, LocalPos.x);
+      
+      // Multiplicamos por 4 para tener 4 rayas rojas y 4 blancas
+      if (sin(angulo * 4.0) > 0.0) {
+          FragColor = vec4(0.0, 0.0, 0.0, 1.0); // Franja Roja
+      } else {
+          FragColor = vec4(1.0, 1.0, 1.0, 1.0); // Franja Blanca
+      }
+      return;
   }
 
   // Si no es la pelota, calculamos cómo le pega la luz

@@ -1,3 +1,5 @@
+//Ledesma Fabián y Mendoza Bryan
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
@@ -102,7 +104,7 @@ class GameObject {
 class Bloque : public GameObject {
   private:
     bool destruyendo = false;
-    float velocidadEncogimiento = 4.0f; 
+    float velocidadEncogimiento = 1.2f; 
 
   public:
     void Update() override {
@@ -459,9 +461,8 @@ int main() {
   unsigned int lightColorLoc = glGetUniformLocation(ourShader.ID, "lightColor");
   unsigned int esSolLoc = glGetUniformLocation(ourShader.ID, "esSol");
   unsigned int viewPosLoc = glGetUniformLocation(ourShader.ID, "viewPos");
-
-  float lastFrame = 0.0f;
-  float deltaTime = 0.0f;
+  unsigned int projLoc = glGetUniformLocation(ourShader.ID, "projection");
+  unsigned int viewLoc = glGetUniformLocation(ourShader.ID, "view");
 
   // Estado del juego
   bool gameOver = false;
@@ -495,6 +496,18 @@ int main() {
           break;
         }
       }
+
+      //victoria
+      bool todosDestruidos = true;
+      for (const auto& bloque : bloques) {
+          if (bloque.IsActive()) { todosDestruidos = false; break; }
+      }
+      if (todosDestruidos) {
+          std::cout << "¡GANASTE! Todos los bloques destruidos.\n";
+          std::cout << "Presiona [ENTER] para jugar de nuevo.\n";
+          gameOver = true;
+      }
+
     }
     
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -524,10 +537,8 @@ int main() {
       glm::vec3(0.0f, 1.0f, 0.0f)     
     );
 
-    unsigned int projLoc = glGetUniformLocation(ourShader.ID, "projection");
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-
-    unsigned int viewLoc = glGetUniformLocation(ourShader.ID, "view");
+    
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
     glBindVertexArray(VAO);
@@ -627,7 +638,7 @@ void processInput(GLFWwindow *window, Paleta& paleta, bool& gameOver, Pelota& pe
   }
   glm::vec3 pos = paleta.GetPosition();
   
-  float deltaZ = 0.2f; // Velocidad de movimiento en Z
+  float deltaZ = 0.15f; // Velocidad de movimiento en Z
   float deltaX = 0.15f; // Velocidad de movimiento en X
   if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
     pos.x -= deltaX;
