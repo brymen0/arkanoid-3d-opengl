@@ -170,7 +170,6 @@ class Paleta : public GameObject {
 class Pelota : public GameObject {
   private:
     glm::vec3 velocidad;
-    float radio;
     float rotacionX = 0.0f;
     // Velocidad con la que arranca la pelota siempre que se (re)inicia el juego.
     // Se guarda en un solo lugar para no repetir estos valores en varias partes.
@@ -179,11 +178,12 @@ class Pelota : public GameObject {
   public:
     Pelota() {
       velocidad = VelocidadInicial();
-      radio = 0.4f;
     }
     void InvertirY() { velocidad.y = -velocidad.y; }
+    float GetRadio() const { return GetScale().x; }
 
     AABB GetCollider() const override {
+      float radio = GetRadio();
       glm::vec3 r(radio, radio, radio);
       return { GetPosition() - r, GetPosition() + r };
     }
@@ -191,6 +191,8 @@ class Pelota : public GameObject {
     void Update () override {
       glm::vec3 posActual = GetPosition();
       posActual += velocidad * 0.02f;
+
+      float radio = GetRadio();
 
       // Colisión con paredes laterales (izquierda/derecha, eje X)
       if (posActual.x - radio <= -10.0f) {
