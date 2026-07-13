@@ -102,7 +102,7 @@ class GameObject {
 class Bloque : public GameObject {
   private:
     bool destruyendo = false;
-    float velocidadEncogimiento = 6.0f; 
+    float velocidadEncogimiento = 4.0f; 
 
   public:
     void Update() override {

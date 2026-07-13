@@ -10,6 +10,7 @@ uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
 uniform vec3 objectColor;
+uniform bool esSol;
 
 void main() {
     gl_Position = projection * view * model * vec4(aPos, 1.0);
@@ -20,5 +21,10 @@ void main() {
     // transformar las normales al marco del mundo (mat3 porque en las normales nos immporta la direccion unicamente (no importa la traslación))
     Normal = mat3(transpose(inverse(model))) * aNormal;
 
-    Color = objectColor;
+    if (esSol) {
+        float factor = abs(aPos.y); 
+        Color = mix(objectColor * 0.5, objectColor, factor);
+    } else {
+        Color = objectColor;
+    }
 }
