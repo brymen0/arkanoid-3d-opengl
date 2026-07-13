@@ -277,30 +277,7 @@ int main() {
 
   Shader ourShader("shader-vertices.vs", "shader-fragmentos.fs");
 
-  /*
-  // Cubo Maestro
   Vertex verticesCubo[36] = {
-    // Cara Trasera
-    {{-0.5f, -0.5f, -0.5f}}, {{ 0.5f, -0.5f, -0.5f}}, {{ 0.5f,  0.5f, -0.5f}},
-    {{ 0.5f,  0.5f, -0.5f}}, {{-0.5f,  0.5f, -0.5f}}, {{-0.5f, -0.5f, -0.5f}},
-    // Cara Frontal
-    {{-0.5f, -0.5f,  0.5f}}, {{ 0.5f, -0.5f,  0.5f}}, {{ 0.5f,  0.5f,  0.5f}},
-    {{ 0.5f,  0.5f,  0.5f}}, {{-0.5f,  0.5f,  0.5f}}, {{-0.5f, -0.5f,  0.5f}},
-    // Cara Izquierda
-    {{-0.5f,  0.5f,  0.5f}}, {{-0.5f,  0.5f, -0.5f}}, {{-0.5f, -0.5f, -0.5f}},
-    {{-0.5f, -0.5f, -0.5f}}, {{-0.5f, -0.5f,  0.5f}}, {{-0.5f,  0.5f,  0.5f}},
-    // Cara Derecha
-    {{ 0.5f,  0.5f,  0.5f}}, {{ 0.5f,  0.5f, -0.5f}}, {{ 0.5f, -0.5f, -0.5f}},
-    {{ 0.5f, -0.5f, -0.5f}}, {{ 0.5f, -0.5f,  0.5f}}, {{ 0.5f,  0.5f,  0.5f}},
-    // Cara Inferior
-    {{-0.5f, -0.5f, -0.5f}}, {{ 0.5f, -0.5f, -0.5f}}, {{ 0.5f, -0.5f,  0.5f}},
-    {{ 0.5f, -0.5f,  0.5f}}, {{-0.5f, -0.5f,  0.5f}}, {{-0.5f, -0.5f, -0.5f}},
-    // Cara Superior
-    {{-0.5f,  0.5f, -0.5f}}, {{ 0.5f,  0.5f, -0.5f}}, {{ 0.5f,  0.5f,  0.5f}},
-    {{ 0.5f,  0.5f,  0.5f}}, {{-0.5f,  0.5f,  0.5f}}, {{-0.5f,  0.5f, -0.5f}}
-  };
-  */
- Vertex verticesCubo[36] = {
     // Cara Trasera (Normal apunta hacia -Z)
     {{-0.5f, -0.5f, -0.5f}, { 0.0f,  0.0f, -1.0f}}, 
     {{ 0.5f, -0.5f, -0.5f}, { 0.0f,  0.0f, -1.0f}}, 
@@ -641,21 +618,25 @@ void processInput(GLFWwindow *window, Paleta& paleta, bool& gameOver, Pelota& pe
   if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     glfwSetWindowShouldClose(window, true);
 
-  if (gameOver && glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS) {
-    ReiniciarJuego(pelota, paleta, bloques);
-    gameOver = false;
+  if (gameOver) {
+    if (glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS) {
+      ReiniciarJuego(pelota, paleta, bloques);
+      gameOver = false;
+    }
     return; //evitar que la pelota se mueva
   }
   glm::vec3 pos = paleta.GetPosition();
   
+  float deltaZ = 0.2f; // Velocidad de movimiento en Z
+  float deltaX = 0.15f; // Velocidad de movimiento en X
   if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
-    pos.x -= 0.3f;
+    pos.x -= deltaX;
   if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
-    pos.x += 0.3f;
+    pos.x += deltaX;
   if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
-    pos.z += 0.3f;
+    pos.z += deltaZ;
   if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
-    pos.z -= 0.3f;
+    pos.z -= deltaZ;
 
   paleta.SetPosition(pos);
 }
